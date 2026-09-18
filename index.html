@@ -256,7 +256,7 @@ input{user-select:text;}
 
 </div>
 
-<button class="keyBtn" id="keyBtn" style="display:none" onclick="toggleKey()">🔑 ANSWER KEY</button>
+<button class="keyBtn" id="keyBtn" style="display:none" onclick="toggleKey()">🔑 Answers (private)</button>
 <div class="keyPanel" id="keyPanel"><h4>Puzzle order & answers (host only)</h4><div id="keyList"></div></div>
 
 <script>
@@ -335,7 +335,13 @@ function hostLogin(){
   });
 }
 function buildKey(){var l=document.getElementById('keyList');l.innerHTML='';gameOrder.forEach(function(idx,n){var p=PUZZLES[idx];var r=document.createElement('div');r.className='keyrow';r.innerHTML='<span class="n">'+(n+1)+'</span><span class="a">'+p.disp+'</span>';l.appendChild(r);});}
-function toggleKey(){document.getElementById('keyPanel').classList.toggle('on');}
+function toggleKey(){
+  var panel=document.getElementById('keyPanel');
+  if(!panel.classList.contains('on')){
+    if(!confirm('Show the ANSWER KEY? Do NOT do this while the big screen is projected — players will see all answers.')) return;
+  }
+  panel.classList.toggle('on');
+}
 
 function hostStart(){hostQ=0;fbSet('rr/meta/state','live');show('hLive');hostNextRound();}
 function hostNextRound(){
@@ -399,13 +405,14 @@ function hostEnd(){
 var me={key:null,name:'',score:0,solved:0};
 var curIdx=-1,answeredThisRound=false,hintUsed=false,lastRound=0;
 function playerJoin(){
-  var pin=document.getElementById('pinIn').value.trim();
+  var pin=document.getElementById('pinIn').value.replace(/\D/g,'').trim();
   var name=document.getElementById('nameIn').value.trim();
   var err=document.getElementById('pJoinErr');
   if(!pin||!name){err.textContent='Enter the PIN and your name.';vibe(150);return;}
   fbGet('rr/meta').then(function(snap){
     var meta=snap.val();
-    if(!meta||meta.pin!==pin){err.textContent='Wrong PIN. Check the big screen.';vibe(200);return;}
+    if(!meta){err.textContent='No active game yet. Ask the host to open the lobby.';vibe(200);return;}
+    if(String(meta.pin).trim()!==String(pin).trim()){err.textContent='Wrong PIN. Check the big screen.';vibe(200);return;}
     if(meta.state&&meta.state!=='lobby'){err.textContent='Game already started — wait for the next one.';return;}
     me.name=name;
     fbPush('rr/players',{name:name,score:0,solved:0,lastSolved:0}).then(function(ref){
