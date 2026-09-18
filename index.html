@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<title>Rebus Rush — Chennai SNUG</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1020;--ink:#eaf2ff;--muted:#7f8db5;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.1);
+  --amber:#ffb020;--sky:#37b4ff;--mint:#2ce8b0;--rose:#ff5c8a;--violet:#9d7bff;--paper:#fdfbf4;-- pen:#1a2238;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Space Grotesk',sans-serif;touch-action:manipulation;}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;overflow:hidden;}
+input{user-select:text;}
+
+/* ambient blueprint-grid background (distinct new theme) */
+.bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1200px 600px at 15% 0%, rgba(55,180,255,.10), transparent 60%),
+    radial-gradient(1000px 700px at 100% 100%, rgba(157,123,255,.10), transparent 60%),
+    linear-gradient(180deg,#0b1020,#0a0e1a);}
+.grid{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(120,150,220,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(120,150,220,.08) 1px,transparent 1px);
+  background-size:44px 44px;mask-image:radial-gradient(circle at 50% 40%,#000,transparent 85%);}
+.orbf{position:fixed;border-radius:50%;filter:blur(80px);z-index:0;pointer-events:none;opacity:.5;}
+.o1{width:44vw;height:44vw;background:#1f6dff;top:-14vw;left:-10vw;animation:fl 16s ease-in-out infinite;}
+.o2{width:40vw;height:40vw;background:#7d3cff;bottom:-14vw;right:-10vw;animation:fl 19s ease-in-out infinite reverse;}
+@keyframes fl{0%,100%{transform:translate(0,0);}50%{transform:translate(4vw,3vh);}}
+
+.screen{position:relative;z-index:1;flex:1;width:100%;max-width:680px;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;text-align:center;overflow-y:auto;}
+.screen.on{display:flex;}
+.wide{max-width:1180px;}
+
+.brandrow{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:8px;}
+.snlogo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.5px;}
+.snlogo .o{color:#62D84E;}
+.kicker{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:10px;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(46px,13vw,92px);line-height:.92;letter-spacing:-2px;
+  background:linear-gradient(115deg,var(--amber),var(--rose),var(--violet),var(--sky));background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:sl 6s linear infinite;}
+@keyframes sl{to{background-position:300% 0;}}
+.sub{color:var(--sky);font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(18px,3vw,26px);margin-top:8px;}
+.tag{color:var(--muted);font-size:14px;margin-top:10px;max-width:340px;line-height:1.55;}
+
+.cta{margin-top:26px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#0a1020;
+  padding:18px 46px;border-radius:16px;background:linear-gradient(120deg,var(--mint),var(--sky));box-shadow:0 10px 30px rgba(44,232,176,.25);}
+.cta:active{transform:scale(.95);}
+.cta:disabled{opacity:.4;}
+.ghost{margin-top:14px;border:1px solid var(--line);background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;padding:12px 26px;border-radius:12px;cursor:pointer;}
+
+.field{width:100%;max-width:340px;margin-top:14px;text-align:left;}
+.field label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;}
+.field input{width:100%;padding:16px 18px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;outline:none;text-align:center;letter-spacing:1px;}
+.field input:focus{border-color:var(--mint);}
+
+.modebar{position:fixed;top:14px;right:14px;z-index:50;display:flex;background:var(--card);border:1px solid var(--line);border-radius:100px;padding:4px;}
+.modebar button{border:none;background:transparent;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;padding:8px 16px;border-radius:100px;cursor:pointer;}
+.modebar button.sel{background:linear-gradient(120deg,var(--mint),var(--sky));color:#0a1020;}
+
+/* HOST LOBBY */
+.pinbig{font-family:'Syne',sans-serif;font-size:clamp(66px,17vw,132px);font-weight:800;letter-spacing:10px;color:var(--amber);text-shadow:0 0 50px rgba(255,176,32,.35);line-height:1;}
+.joinline{color:var(--muted);font-size:14px;margin-top:8px;}
+.players{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;max-width:820px;}
+.pchip{background:var(--card);border:1px solid var(--line);border-radius:100px;padding:9px 18px;font-weight:700;font-size:15px;animation:ci .35s cubic-bezier(.34,1.56,.64,1);}
+@keyframes ci{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+/* PUZZLE CARD (paper look for max contrast on projector) */
+.puzzleWrap{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;}
+.rounddot{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);}
+.puzzle{background:var(--paper);border-radius:22px;width:100%;max-width:760px;aspect-ratio:16/8;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.45),inset 0 0 0 6px rgba(0,0,0,.03);overflow:hidden;animation:pin .45s cubic-bezier(.34,1.56,.64,1);}
+@keyframes pin{from{transform:scale(.9) rotate(-1deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
+.puzzle svg{width:100%;height:100%;}
+.diffTag{display:inline-block;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:800;padding:4px 12px;border-radius:100px;}
+.diffTag.med{background:rgba(44,232,176,.15);color:var(--mint);}
+.diffTag.tough{background:rgba(255,92,138,.15);color:var(--rose);}
+
+/* big timer */
+.bigTime{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(48px,8vw,84px);line-height:1;color:var(--sky);text-shadow:0 0 34px rgba(55,180,255,.4);}
+.bigTime.low{color:var(--rose);animation:tk .4s infinite;text-shadow:0 0 34px rgba(255,92,138,.55);}
+@keyframes tk{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+.hostTop{width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.answerReveal{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(30px,6vw,56px);color:var(--mint);min-height:36px;letter-spacing:1px;}
+.whyLine{color:var(--muted);font-size:16px;margin-top:6px;max-width:720px;}
+.solvedCount{color:var(--amber);font-weight:700;font-size:15px;margin-top:4px;}
+
+/* leaderboard */
+.lb{width:100%;max-width:720px;display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.lbrow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 14px;transition:transform .4s;}
+.lbrow .rank{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;width:32px;color:var(--muted);}
+.lbrow:nth-child(1) .rank{color:var(--amber);}
+.lbrow:nth-child(2) .rank{color:#cfd6ff;}
+.lbrow:nth-child(3) .rank{color:#ff9d5c;}
+.lbrow .nm{font-weight:700;font-size:16px;flex:0 0 150px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lbrow .barwrap{flex:1;height:16px;background:rgba(255,255,255,.06);border-radius:100px;overflow:hidden;}
+.lbrow .bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--sky),var(--mint));transition:width .5s ease;}
+.lbrow .sc{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;color:var(--mint);min-width:70px;text-align:right;}
+
+
+
+
+
+
+
+
+
+/* PLAYER */
+#pPlay{justify-content:flex-start;padding-top:14px;}
+.phud{width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.phbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 14px;min-width:78px;}
+.phbox .l{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.phbox .v{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;line-height:1;}
+#pTime{color:var(--sky);}#pTime.low{color:var(--rose);animation:tk .4s infinite;}
+#pScore{color:var(--mint);}#pSolved{color:var(--amber);}
+.pPuzzleMini{background:var(--paper);border-radius:16px;width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(0,0,0,.4);margin-bottom:12px;overflow:hidden;}
+.pPuzzleMini svg{width:100%;height:100%;}
+.answerBox{width:100%;display:flex;gap:8px;}
+.answerBox input{flex:1;padding:16px 18px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;outline:none;}
+.answerBox input:focus{border-color:var(--sky);}
+.answerBox button{border:none;border-radius:14px;padding:0 22px;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:#0a1020;background:linear-gradient(120deg,var(--mint),var(--sky));cursor:pointer;}
+.answerBox button:active{transform:scale(.95);}
+.pMsg{margin-top:14px;font-family:'Syne',sans-serif;font-weight:800;font-size:20px;min-height:26px;}
+.pMsg.ok{color:var(--mint);}.pMsg.no{color:var(--rose);}.pMsg.rev{color:var(--amber);}
+.pHintRow{margin-top:12px;}
+.miniBtn{border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:12px;letter-spacing:1px;padding:9px 18px;border-radius:100px;cursor:pointer;}
+
+/* result / podium */
+.medal{font-size:70px;animation:pp .6s ease;}
+@keyframes pp{0%{transform:scale(.3);opacity:0;}55%{transform:scale(1.15);}100%{transform:scale(1);}}
+.bigScore{font-family:'Syne',sans-serif;font-size:clamp(56px,18vw,120px);font-weight:800;line-height:.95;color:var(--amber);text-shadow:0 0 40px rgba(255,176,32,.4);margin:4px 0;}
+.rTitle{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;}
+.rSub{color:var(--muted);font-size:13px;margin-top:6px;}
+.podium{display:flex;align-items:flex-end;gap:14px;margin-top:22px;}
+.pod{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.pod .nm{font-weight:800;font-size:16px;}
+.pod .pts{color:var(--mint);font-family:'Syne',sans-serif;font-weight:800;}
+.pod .blk{width:88px;border-radius:14px 14px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#0a1020;}
+.pod.p1 .blk{height:132px;background:linear-gradient(180deg,var(--amber),transparent);}
+.pod.p2 .blk{height:96px;background:linear-gradient(180deg,#cfd6ff,transparent);}
+.pod.p3 .blk{height:72px;background:linear-gradient(180deg,#ff9d5c,transparent);}
+
+.confetti{position:fixed;top:-16px;z-index:70;pointer-events:none;animation:fall linear forwards;}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.4;}}
+
+@media(max-width:560px){
+  .puzzle{aspect-ratio:16/9;}
+  .answerBox input{font-size:16px;}
+}
+</style>
+</head>
+<body>
+<div class="bgfx"></div><div class="grid"></div><div class="orbf o1"></div><div class="orbf o2"></div>
+
+<div class="modebar" id="modebar">
+  <button id="mHost" onclick="setMode('host')">🖥 Host</button>
+  <button id="mPlayer" class="sel" onclick="setMode('player')">📱 Player</button>
+</div>
+
+<div id="app">
+
+<!-- PLAYER JOIN -->
+<section class="screen on" id="pJoin">
+  <div class="brandrow"><span class="snlogo">servicen<span class="o">o</span>w</span></div>
+  <div class="kicker">Chennai SNUG</div>
+  <div class="logo">REBUS<br>RUSH</div>
+  <div class="sub">Crack the picture puzzle</div>
+  <div class="field"><label>Game PIN</label><input id="pinIn" inputmode="numeric" maxlength="4" placeholder="0000"></div>
+  <div class="field"><label>Your name</label><input id="nameIn" maxlength="14" placeholder="e.g. PuzzleMaster"></div>
+  <button class="cta" onclick="playerJoin()">JOIN THE RUSH</button>
+  <div class="tag" id="pJoinErr"></div>
+</section>
+
+<!-- PLAYER WAIT -->
+<section class="screen" id="pWait">
+  <div class="medal">🧩</div>
+  <div class="rTitle" id="pWaitName">You're in!</div>
+  <div class="tag">Watch the big screen. Each round shows a picture puzzle — type what phrase it means. Faster = more points. Tough ones ahead!</div>
+</section>
+
+<!-- PLAYER PLAY -->
+<section class="screen" id="pPlay">
+  <div class="phud">
+    <div class="phbox"><div class="l">Time</div><div class="v" id="pTime">25</div></div>
+    <div class="phbox"><div class="l">Score</div><div class="v" id="pScore">0</div></div>
+    <div class="phbox"><div class="l">Solved</div><div class="v" id="pSolved">0</div></div>
+  </div>
+  <div class="rounddot" id="pRound">Puzzle 1</div>
+  <div style="font-size:12px;letter-spacing:1px;color:var(--muted);margin-bottom:8px;">🧩 Read the picture — type the phrase it means</div>
+  <div class="pPuzzleMini" id="pPuzzle"></div>
+  <div class="answerBox">
+    <input id="pAnswer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the phrase…" onkeydown="if(event.key==='Enter')submitAnswer()">
+    <button onclick="submitAnswer()">GO</button>
+  </div>
+  <div class="pMsg" id="pMsg"></div>
+  <div class="pHintRow"><button class="miniBtn" onclick="useHint()" id="pHintBtn">💡 HINT (−40%)</button></div>
+</section>
+
+<!-- PLAYER DONE -->
+<section class="screen" id="pDone">
+  <div class="medal" id="pMedal">🏆</div>
+  <div class="rTitle" id="pWord">PUZZLE ACE</div>
+  <div class="bigScore" id="pFinal">0</div>
+  <div class="rSub" id="pStats"></div>
+  <div class="tag">Check the big screen for the podium!</div>
+</section>
+
+<!-- HOST LOGIN -->
+<section class="screen" id="hLogin">
+  <div class="brandrow"><span class="snlogo">servicen<span class="o">o</span>w</span></div>
+  <div class="logo" style="font-size:clamp(40px,9vw,64px)">HOST</div>
+  <div class="field"><label>Host password</label><input id="hPass" type="password" placeholder="••••••••"></div>
+  <button class="cta" onclick="hostLogin()">OPEN LOBBY</button>
+  <div class="tag" id="hErr"></div>
+</section>
+
+<!-- HOST LOBBY -->
+<section class="screen wide" id="hLobby">
+  <div class="kicker">Rebus Rush · Chennai SNUG Developer User Group</div>
+  <div class="pinbig" id="hPin">0000</div>
+  <div class="joinline"><span id="hCount">0</span> players joined</div>
+  <div class="players" id="hPlayers"></div>
+  <button class="cta" id="hStartBtn" onclick="hostStart()" disabled>START REBUS RUSH 🧩</button>
+</section>
+
+<!-- HOST LIVE -->
+<section class="screen wide" id="hLive">
+  <div class="hostTop">
+    <div style="text-align:left">
+      <div class="rounddot" id="hRoundNum">Puzzle 1 of 15</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px;">🧩 What phrase does this picture mean?</div>
+    </div>
+    <div class="bigTime" id="hTime">25</div>
+  </div>
+  <div class="puzzleWrap">
+    <div class="puzzle" id="hPuzzle"></div>
+    <div class="answerReveal" id="hAnswer"></div>
+    <div class="whyLine" id="hWhy"></div>
+    <div class="solvedCount" id="hSolved"></div>
+  </div>
+  <div class="lb" id="hLb"></div>
+</section>
+
+<!-- HOST FINAL -->
+<section class="screen wide" id="hFinal">
+  <div class="medal">🏆</div>
+  <div class="logo" style="font-size:clamp(32px,7vw,54px)">CHAMPIONS</div>
+  <div class="podium" id="hPodium"></div>
+  <div class="lb" id="hFinalLb" style="margin-top:24px;max-width:640px;"></div>
+  <button class="ghost" onclick="location.reload()">NEW GAME</button>
+</section>
+
+</div>
+
+
+<script>
+// ═════════ FIREBASE ═════════
+var db=null;
+window.addEventListener('load',function(){
+  try{
+    firebase.initializeApp({apiKey:"AIzaSy5y1jmLp0OQgMH4Qxpw2ALNHWIa1AT6zY",authDomain:"snowsmash.firebaseapp.com",databaseURL:"https://snowsmash-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"snowsmash",storageBucket:"snowsmash.firebasestorage.app",messagingSenderId:"986304526180",appId:"1:986304526180:web:858e7a0202bbd45e24ec71"});
+    db=firebase.database();
+  }catch(e){console.warn('Firebase:',e);}
+});
+function fbSet(p,v){if(db)return db.ref(p).set(v);return Promise.resolve();}
+function fbGet(p){if(db)return db.ref(p).get();return Promise.resolve({exists:function(){return false},val:function(){return null}});}
+function fbOn(p,cb){if(db)db.ref(p).on('value',cb);}
+function fbPush(p,v){if(db)return db.ref(p).push(v);return Promise.resolve({key:'x'});}
+function fbRemove(p){if(db)return db.ref(p).remove();return Promise.resolve();}
+var HOST_PASSWORD='snow2026';
+var ROUND_TIME=25, REVEAL_TIME=5;
+
+// ═════════ 15 REBUS PUZZLES (original SVG art) ═════════
+// each: svg builder, list of accepted answers (lowercased, spaces stripped on compare), display answer, why, difficulty
+function P(bodyFn){return bodyFn;}
+var INK='#1a2238';
+function svg(inner){return '<svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg"><rect width="800" height="400" fill="#fdfbf4"/>'+inner+'</svg>';}
+function T(x,y,s,txt,extra){return '<text x="'+x+'" y="'+y+'" font-family="Space Grotesk,Arial" font-weight="800" font-size="'+s+'" fill="'+INK+'" text-anchor="middle" '+(extra||'')+'>'+txt+'</text>';}
+function TL(x,y,s,txt){return '<text x="'+x+'" y="'+y+'" font-family="Space Grotesk,Arial" font-weight="800" font-size="'+s+'" fill="'+INK+'" text-anchor="start">'+txt+'</text>';}
+function TR(x,y,s,txt){return '<text x="'+x+'" y="'+y+'" font-family="Space Grotesk,Arial" font-weight="800" font-size="'+s+'" fill="'+INK+'" text-anchor="end">'+txt+'</text>';}
+
+var PUZZLES=[
+  {svg:svg(T(400,240,120,'Ne14 10s')),ans:['anyonefortennis','tennisanyone'],disp:'Anyone for tennis?',why:'“N-e”=any, “14”=one-four=for, “10s”=tennis.',d:'tough'},
+  {svg:svg(T(400,110,88,'T')+T(400,190,88,'O')+T(400,270,88,'W')+T(400,350,88,'N')),ans:['downtown'],disp:'Downtown',why:'The word TOWN goes straight down.',d:'med'},
+  {svg:svg(T(400,240,120,'M1LL1ON')),ans:['oneinamillion'],disp:'One in a million',why:'A “1” sits inside MILLION.',d:'tough'},
+  {svg:svg('<line x1="140" y1="150" x2="660" y2="150" stroke="'+INK+'" stroke-width="7"/>'+T(400,238,64,'R E A D I N G')+'<line x1="140" y1="270" x2="660" y2="270" stroke="'+INK+'" stroke-width="7"/>'),ans:['readingbetweenthelines'],disp:'Reading between the lines',why:'READING is between two lines.',d:'med'},
+  {svg:svg(T(400,245,130,'ECNALG')),ans:['backwardglance','glancebackward','abackwardglance'],disp:'Backward glance',why:'GLANCE is written backward.',d:'tough'},
+  {svg:svg(TL(150,240,66,'HISTORY')+TL(150,320,66,'HISTORY')),ans:['historyrepeatsitself','historyrepeats'],disp:'History repeats itself',why:'HISTORY appears twice — it repeats.',d:'med'},
+  {svg:svg(T(400,150,100,'HEAD')+T(400,300,100,'HEELS')),ans:['headoverheels'],disp:'Head over heels',why:'HEAD sits over HEELS.',d:'med'},
+  {svg:svg(T(400,150,88,'KNEE')+T(400,300,88,'LIGHT')),ans:['neonlight','neon'],disp:'Neon light',why:'“KNEE-on LIGHT” = neon light.',d:'med'},
+  {svg:svg(TL(224,250,100,'M')+TL(349,250,100,'1')+TL(444,250,100,'LE')),ans:['onemile','mile'],disp:'One mile',why:'M + 1 + LE = “one mile”.',d:'tough'},
+  {svg:svg(TL(132,250,100,'BAN')+TL(430,250,100,'ANA')),ans:['bananasplit'],disp:'Banana split',why:'BANANA is split into two parts.',d:'med'},
+  {svg:svg(T(400,180,120,'C C C C C C C')+T(400,290,46,'( count them )')),ans:['sevenseas','7seas','thesevenseas'],disp:'Seven seas',why:'Seven letter “C”s = seven seas.',d:'tough'},
+  {svg:svg(T(400,150,110,'STAND')+T(400,300,88,'I')),ans:['iunderstand','understand'],disp:'I understand',why:'“I” under “STAND” = I-under-stand.',d:'tough'},
+  {svg:svg(T(400,150,110,'GROUND')+T(400,300,88,'FEET')),ans:['sixfeetunder','6feetunder'],disp:'Six feet under',why:'FEET is under the GROUND (buried).',d:'tough'},
+  {svg:svg('<path d="M160 300 Q 400 150 640 300" stroke="'+INK+'" stroke-width="9" fill="none"/>'+T(400,270,72,'ROAD')),ans:['bumpintheroad','abumpintheroad'],disp:'Bump in the road',why:'A bump (arc) rises over ROAD.',d:'tough'},
+  {svg:svg(TL(113,255,90,'ESROH')+TL(500,255,70,'back')),ans:['horseback'],disp:'Horseback',why:'HORSE backward + “back”.',d:'med'}
+];
+// fix puzzle index 12 (0-based) — replace the placeholder with a clean one
+PUZZLES[12]={svg:svg(T(400,150,120,'STAND')+T(400,300,60,'I')),ans:['iunderstand','understand'],disp:'I understand',why:'“I” under “STAND” = I-under-stand.',d:'tough'};
+
+var gameOrder=[];
+
+// ═════════ SHARED ═════════
+function vibe(p){try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
+function show(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on');});document.getElementById(id).classList.add('on');}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function norm(s){return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function blast(n){var cols=['#ffb020','#37b4ff','#2ce8b0','#ff5c8a','#9d7bff'];for(var i=0;i<n;i++){var p=document.createElement('div');p.className='confetti';p.style.left=Math.random()*100+'vw';p.style.background=cols[Math.floor(Math.random()*cols.length)];var s=7+Math.random()*11;p.style.width=p.style.height=s+'px';p.style.borderRadius=Math.random()>.5?'50%':'2px';p.style.animationDuration=(2+Math.random()*2.4)+'s';document.body.appendChild(p);(function(el){setTimeout(function(){el.remove();},5200);})(p);}}
+
+var mode='player';
+function setMode(m){mode=m;document.getElementById('mHost').classList.toggle('sel',m==='host');document.getElementById('mPlayer').classList.toggle('sel',m==='player');show(m==='host'?'hLogin':'pJoin');}
+
+// ═════════ HOST ═════════
+var hostRoundTimer=null,hostRevealTimer=null,hostQ=0;
+function hostLogin(){
+  var p=document.getElementById('hPass').value.trim();
+  if(p!==HOST_PASSWORD){document.getElementById('hErr').textContent='Wrong password.';vibe(200);return;}
+  if(!db){document.getElementById('hErr').textContent='Still connecting to server… wait 2 seconds and try again.';return;}
+  var pin=String(Math.floor(1000+Math.random()*9000));
+  gameOrder=shuffle(PUZZLES.map(function(_,i){return i;}));
+  fbRemove('rr').then(function(){
+    return fbSet('rr/pin',pin);
+  }).then(function(){
+    return fbSet('rr/state','lobby');
+  }).then(function(){
+    return fbSet('rr/order',gameOrder);
+  }).then(function(){
+    document.getElementById('hPin').textContent=pin;
+    show('hLobby');
+    fbOn('rr/players',function(snap){
+      var ps=snap.exists()?Object.values(snap.val()):[];
+      document.getElementById('hCount').textContent=ps.length;
+      var wrap=document.getElementById('hPlayers');wrap.innerHTML='';
+      ps.forEach(function(pl){var c=document.createElement('div');c.className='pchip';c.textContent=pl.name;wrap.appendChild(c);});
+      document.getElementById('hStartBtn').disabled=ps.length===0;
+      if(document.getElementById('hLive').classList.contains('on'))renderLb(ps,'hLb');
+    });
+  });
+}
+
+function hostStart(){hostQ=0;fbSet('rr/state','live');show('hLive');hostNextRound();}
+function hostNextRound(){
+  clearInterval(hostRoundTimer);clearInterval(hostRevealTimer);
+  if(hostQ>=gameOrder.length){hostEnd();return;}
+  var idx=gameOrder[hostQ];var p=PUZZLES[idx];
+  fbSet('rr/round',{n:hostQ+1,total:gameOrder.length,puzzleIndex:idx,phase:'play',time:ROUND_TIME,at:Date.now()});
+  fbSet('rr/bus',{event:'ROUND',n:hostQ+1,at:Date.now()});
+  document.getElementById('hRoundNum').innerHTML='Puzzle '+(hostQ+1)+' of '+gameOrder.length+'  <span class="diffTag '+(p.d==='tough'?'tough':'med')+'">'+(p.d==='tough'?'TOUGH':'MEDIUM')+'</span>';
+  document.getElementById('hPuzzle').innerHTML=p.svg;
+  document.getElementById('hAnswer').textContent='';
+  document.getElementById('hWhy').textContent='';
+  document.getElementById('hSolved').textContent='';
+  var t=ROUND_TIME;var el=document.getElementById('hTime');el.textContent=t;el.classList.remove('low');
+  hostRoundTimer=setInterval(function(){
+    t--;el.textContent=t;el.classList.toggle('low',t<=5);fbSet('rr/round/time',t);
+    if(t<=5&&t>0)tick();
+    if(t<=0){clearInterval(hostRoundTimer);hostReveal(p);}
+  },1000);
+}
+function hostReveal(p){
+  fbSet('rr/round/phase','reveal');fbSet('rr/round/answer',p.disp);
+  fbSet('rr/bus',{event:'REVEAL',answer:p.disp,at:Date.now()});
+  document.getElementById('hAnswer').textContent='✓ '+p.disp;
+  document.getElementById('hWhy').textContent=p.why;
+  fbGet('rr/players').then(function(snap){
+    var ps=snap.exists()?Object.values(snap.val()):[];
+    var solved=ps.filter(function(x){return x.lastSolved===(hostQ+1);}).length;
+    document.getElementById('hSolved').textContent=solved+' of '+ps.length+' cracked it';
+    renderLb(ps,'hLb');
+  });
+  chime();
+  var rt=REVEAL_TIME;document.getElementById('hTime').textContent='✓';
+  hostRevealTimer=setInterval(function(){rt--;if(rt<=0){clearInterval(hostRevealTimer);hostQ++;hostNextRound();}},1000);
+}
+function renderLb(players,tid){
+  var sorted=players.slice().sort(function(a,b){return (b.score||0)-(a.score||0);});
+  var max=Math.max(1,sorted[0]?sorted[0].score||0:0);
+  var lb=document.getElementById(tid);lb.innerHTML='';
+  sorted.slice(0,10).forEach(function(p,i){
+    var row=document.createElement('div');row.className='lbrow';
+    row.innerHTML='<div class="rank">'+(i+1)+'</div><div class="nm">'+p.name+'</div><div class="barwrap"><div class="bar" style="width:'+Math.round((p.score||0)/max*100)+'%"></div></div><div class="sc">'+(p.score||0)+'</div>';
+    lb.appendChild(row);
+  });
+}
+function hostEnd(){
+  clearInterval(hostRoundTimer);clearInterval(hostRevealTimer);
+  fbSet('rr/bus',{event:'END',at:Date.now()});fbSet('rr/state','done');
+  fbGet('rr/players').then(function(snap){
+    var ps=snap.exists()?Object.values(snap.val()):[];
+    var sorted=ps.slice().sort(function(a,b){return (b.score||0)-(a.score||0);});
+    show('hFinal');
+    var pod=document.getElementById('hPodium');pod.innerHTML='';
+    var order=[1,0,2],cls=['p2','p1','p3'];
+    order.forEach(function(idx,k){var p=sorted[idx];if(!p)return;var d=document.createElement('div');d.className='pod '+cls[k];d.innerHTML='<div class="nm">'+p.name+'</div><div class="pts">'+(p.score||0)+'</div><div class="blk">'+(idx+1)+'</div>';pod.appendChild(d);});
+    renderLb(ps,'hFinalLb');fanfare();blast(180);setTimeout(function(){blast(130);},1500);
+  });
+}
+
+// ═════════ PLAYER ═════════
+var me={key:null,name:'',score:0,solved:0};
+var curIdx=-1,answeredThisRound=false,hintUsed=false,lastRound=0;
+function playerJoin(){
+  var pin=document.getElementById('pinIn').value.replace(/\D/g,'').trim();
+  var name=document.getElementById('nameIn').value.trim();
+  var err=document.getElementById('pJoinErr');
+  if(!pin||!name){err.textContent='Enter the PIN and your name.';vibe(150);return;}
+  if(!db){err.textContent='Still connecting to server… wait 2 seconds and try again.';return;}
+  fbGet('rr/pin').then(function(snap){
+    if(!snap.exists()||String(snap.val()).trim()!==String(pin).trim()){err.textContent='Wrong PIN. Check the big screen.';vibe(200);return;}
+    me.name=name;
+    fbPush('rr/players',{name:name,score:0,solved:0,lastSolved:0}).then(function(ref){
+      me.key=ref.key;
+      document.getElementById('pWaitName').textContent="You're in, "+name+"!";
+      show('pWait');vibe([40,30,80]);
+      fbOn('rr/round',function(s){var r=s.val();if(!r)return;
+        if(r.phase==='play'&&r.n!==lastRound){lastRound=r.n;startPRound(r);}
+        else if(r.phase==='play'){syncTime(r.time);}
+        else if(r.phase==='reveal'){pReveal(r);}
+      });
+      fbOn('rr/bus',function(s){var ev=s.val();if(ev&&ev.event==='END')playerDone();});
+    });
+  });
+}
+function startPRound(r){
+  answeredThisRound=false;hintUsed=false;curIdx=r.puzzleIndex;
+  show('pPlay');
+  document.getElementById('pRound').textContent='PUZZLE '+r.n+' OF '+r.total;
+  document.getElementById('pPuzzle').innerHTML=PUZZLES[r.puzzleIndex].svg;
+  var inp=document.getElementById('pAnswer');inp.value='';inp.disabled=false;
+  document.getElementById('pMsg').textContent='';document.getElementById('pMsg').className='pMsg';
+  document.getElementById('pHintBtn').style.opacity='1';
+  document.getElementById('pTime').textContent=r.time;document.getElementById('pTime').classList.remove('low');
+  setTimeout(function(){inp.focus();},200);
+}
+function syncTime(t){if(answeredThisRound)return;var tv=document.getElementById('pTime');if(tv){tv.textContent=t;tv.classList.toggle('low',t<=5);if(t<=5&&t>0)vibe(35);}}
+function submitAnswer(){
+  if(answeredThisRound)return;
+  var guess=norm(document.getElementById('pAnswer').value);
+  if(!guess)return;
+  var p=PUZZLES[curIdx];
+  var ok=p.ans.some(function(a){return norm(a)===guess;});
+  var t=parseInt(document.getElementById('pTime').textContent)||0;
+  if(ok){
+    answeredThisRound=true;me.solved++;me.lastSolved=lastRound;
+    var pts=250+t*20;if(hintUsed)pts=Math.floor(pts*0.6);
+    me.score+=pts;
+    document.getElementById('pAnswer').disabled=true;
+    document.getElementById('pMsg').className='pMsg ok';
+    document.getElementById('pMsg').textContent='✓ CRACKED IT! +'+pts;
+    vibe([50,30,60,30,110]);ding();pushScore();updHud();
+  }else{
+    document.getElementById('pMsg').className='pMsg no';
+    document.getElementById('pMsg').textContent='✗ Not quite — try again!';
+    vibe(200);buzz();
+    document.getElementById('pAnswer').select();
+  }
+}
+function useHint(){
+  if(hintUsed||answeredThisRound)return;hintUsed=true;
+  var p=PUZZLES[curIdx];
+  var disp=p.disp;
+  var hint=disp.split(' ').map(function(w,i){return i===0?w[0]+'…':'•'.repeat(Math.min(w.length,4));}).join(' ');
+  document.getElementById('pMsg').className='pMsg rev';
+  document.getElementById('pMsg').textContent='💡 '+disp.split(' ').length+' words · starts with “'+disp[0].toUpperCase()+'”';
+  document.getElementById('pHintBtn').style.opacity='.35';vibe(25);
+}
+function pReveal(r){
+  answeredThisRound=true;
+  document.getElementById('pAnswer').disabled=true;
+  if(!document.getElementById('pMsg').classList.contains('ok')){
+    document.getElementById('pMsg').className='pMsg rev';
+    document.getElementById('pMsg').textContent='Answer: '+(r.answer||'');
+  }
+}
+function pushScore(){if(me.key)fbSet('rr/players/'+me.key,{name:me.name,score:me.score,solved:me.solved,lastSolved:me.lastSolved||0});}
+function updHud(){document.getElementById('pScore').textContent=me.score;var s=document.getElementById('pSolved');if(s)s.textContent=me.solved;}
+var pdone=false;
+function playerDone(){
+  if(pdone)return;pdone=true;pushScore();vibe([100,50,100,50,220]);
+  var word,medal;
+  if(me.score>=2500){word='REBUS LEGEND';medal='👑';}
+  else if(me.score>=1500){word='PUZZLE ACE';medal='🔥';}
+  else if(me.score>=700){word='SHARP EYE';medal='⚡';}
+  else{word='GOOD TRY';medal='🌱';}
+  document.getElementById('pMedal').textContent=medal;
+  document.getElementById('pWord').textContent=word;
+  document.getElementById('pFinal').textContent=me.score;
+  document.getElementById('pStats').textContent=me.solved+' of '+gameOrder.length+' cracked';
+  show('pDone');fanfare();blast(me.score>=1500?130:70);
+}
+
+// ═════════ SOUND (all original Web-Audio synthesis) ═════════
+var actx=null;
+function audio(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}return actx;}
+function ding(){var a=audio();if(!a)return;try{[784,1047,1319].forEach(function(f,i){var o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=f;o.connect(g);g.connect(a.destination);var t=a.currentTime+i*0.07;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.16,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.4);o.start(t);o.stop(t+0.45);});}catch(e){}}
+function buzz(){var a=audio();if(!a)return;try{var o=a.createOscillator(),g=a.createGain();o.type='sawtooth';o.frequency.value=140;o.connect(g);g.connect(a.destination);var t=a.currentTime;g.gain.setValueAtTime(0.14,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);o.frequency.linearRampToValueAtTime(90,t+0.2);o.start(t);o.stop(t+0.26);}catch(e){}}
+function tick(){var a=audio();if(!a)return;try{var o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.value=1000;o.connect(g);g.connect(a.destination);var t=a.currentTime;g.gain.setValueAtTime(0.06,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);o.start(t);o.stop(t+0.1);}catch(e){}}
+function chime(){var a=audio();if(!a)return;try{[523,659,784,1047].forEach(function(f,i){var o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=f;o.connect(g);g.connect(a.destination);var t=a.currentTime+i*0.08;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.14,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.5);o.start(t);o.stop(t+0.55);});}catch(e){}}
+function fanfare(){var a=audio();if(!a)return;try{var run=[523,587,659,784,880,1047];run.forEach(function(f,i){var o=a.createOscillator(),g=a.createGain();o.type='square';o.frequency.value=f;var lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2600;o.connect(lp);lp.connect(g);g.connect(a.destination);var t=a.currentTime+i*0.11;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.13,t+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+0.22);o.start(t);o.stop(t+0.25);});var ct=a.currentTime+run.length*0.11+0.04;[523,659,784,1047].forEach(function(f){var o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=f;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0,ct);g.gain.linearRampToValueAtTime(0.14,ct+0.04);g.gain.setValueAtTime(0.14,ct+0.7);g.gain.exponentialRampToValueAtTime(0.001,ct+1.6);o.start(ct);o.stop(ct+1.7);});}catch(e){}}
+
+document.addEventListener('contextmenu',function(e){e.preventDefault();});
+</script>
+</body>
+</html>
